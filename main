@@ -1,0 +1,69 @@
+#Magneettisensorin käyttöönotto v1.14
+#TKE13 - Riku Roivainen, Markus Rutonen, Ville Pylsy
+#haetaan tarvittavat kirjastot
+import smtplib
+import RPi.GPIO as GPIO
+import time
+
+#sähköpostin lähetykseen tarvittavat moduulit
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+#Käytetään BCM pinnimerkintöjä
+GPIO.setmode(GPIO.BCM)
+#Määrätään kytkin GPIO 4 pinniin.
+GPIO.setup(4, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+#Kun sensori aktivoituu, printataan vahvistusviesti ruudulle ja korotetaan laskuria yhdellä
+def sensorCallback1(channel):
+    print ("Havaitsin magneetin.")
+    global counter
+    counter = counter + 1
+def main():
+    try:
+        while True:
+            time.sleep(3.0)
+    except KeyboardInterrupt:
+                GPIO.cleanup()
+print ("Heiluta magneettia")
+#Määrätään laskin aloittamaan nollasta
+counter = 0
+GPIO.setmode(GPIO.BCM)
+#Määrätään sensorin outout GPIO 18 pinniin
+GPIO.setup(18, GPIO.IN)
+GPIO.add_event_detect(18, GPIO.FALLING, callback=sensorCallback1)
+
+while True:
+        input_state = GPIO.input(4)
+        if input_state == False:
+            #Kytkintä painaessa ohjelma printtaa laskurin summan ruudulle
+            print("Sensorin reagointeja:" ,counter)
+            #Lisätään sähköpostin viestiksi laskurin sisältö liite.txt nimisenä tekstitiedostona
+            with open ("liite.txt", "w") as text_file:
+                text_file.write("Sensoria häirittiin: {} kertaa".format(counter)) 
+            time.sleep(2)
+            print ("Olet painanut kytkintä, lähetän sähköpostin.")
+            #luodaan sähköposti  
+            msg = MIMEMultipart('alternative')
+            msg['subject'] = 'Tervehdys Raspberrystä.'
+            msg['from'] = 'Lähettäjän sähköposti.'
+            msg['to'] = 'Vastaanottajan sähköposti.'
+            filename = "liite.txt"
+            f = open(filename)
+            attachment = MIMEText(f.read())
+            msg.attach(attachment)
+            #sähköpostin sisäänkirjautumisprosessi, gmailin serveri
+            s = smtplib.SMTP('smtp.gmail.com','587')
+            s.ehlo()
+            s.starttls()
+            s.ehlo()
+            s.login('Lähettäjän sähköposti','Sähköpostin salasana')
+            s.sendmail(msg['from'], msg['to'], msg.as_string())
+            s.quit()
+            time.sleep(2)
+           
+
+def sensorCallback2(channel):
+    print ("Tätä viestiä ei pitäisi nähdä.")
+
+if __name__=="__main__":
+    main()
